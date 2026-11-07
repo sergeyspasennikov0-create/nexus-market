@@ -1,6 +1,6 @@
 import sqlite3
 import random
-import os # <-- Добавили для работы с сервером
+import os
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -15,6 +15,17 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS products 
                  (id INTEGER PRIMARY KEY, title TEXT, description TEXT, price INTEGER, icon TEXT)''')
     
+    # Проверяем, есть ли такой админ. Если нет - создаем. Если есть - сбрасываем пароль на 123456
+    c.execute("SELECT COUNT(*) FROM users WHERE email = 'admin@nexus-market.ru'")
+    if c.fetchone()[0] == 0:
+        default_pw = generate_password_hash('123456')
+        c.execute("INSERT INTO users (name, email, phone, password, role) VALUES (?, ?, ?, ?, ?)", 
+                  ('Главный Админ', 'admin@nexus-market.ru', '+7 999 123-45-67', default_pw, 'admin'))
+    else:
+        # Принудительно меняем пароль на 123456
+        default_pw = generate_password_hash('123456')
+        c.execute("UPDATE users SET password = ? WHERE email = 'admin@nexus-market.ru'", (default_pw,))
+
     c.execute("SELECT COUNT(*) FROM products")
     if c.fetchone()[0] == 0:
         products = [
@@ -39,12 +50,9 @@ def index():
     conn.close()
     return render_template('index.html', products=products)
 
-# --- НОВЫЙ МАРШРУТ ДЛЯ UPTIMEROBOT ---
-# Этот маршрут нужен, чтобы "будильник" проверял сайт и не давал ему уснуть
 @app.route('/health')
 def health():
     return "OK", 200
-# -------------------------------------
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -170,8 +178,6 @@ def add_product():
     flash('Товар успешно добавлен!', 'success')
     return redirect(url_for('admin'))
 
-# --- ОБНОВЛЕННЫЙ ЗАПУСК ДЛЯ RENDER ---
 if __name__ == '__main__':
-    # Render сам выдает порт, поэтому мы его запрашиваем
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
