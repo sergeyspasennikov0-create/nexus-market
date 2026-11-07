@@ -3,9 +3,21 @@ import random
 import os
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_mail import Mail, Message
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_vr_project'
+
+# --- НАСТРОЙКИ ПОЧТЫ ---
+app.config['MAIL_SERVER'] = 'smtp.mail.ru'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USE_SSL'] = True
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USER')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASS')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USER')
+app.config['MAIL_SUPPRESS_SEND'] = False
+
+mail = Mail(app)
 
 def init_db():
     conn = sqlite3.connect('store.db')
@@ -15,7 +27,6 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS products 
                  (id INTEGER PRIMARY KEY, title TEXT, description TEXT, price INTEGER, icon TEXT)''')
     
-    # Принудительно ставим пароль 123456 для главного админа
     c.execute("SELECT COUNT(*) FROM users WHERE email = 'admin@nexus-market.ru'")
     if c.fetchone()[0] == 0:
         default_pw = generate_password_hash('123456')
@@ -63,9 +74,17 @@ def register():
         code = str(random.randint(1000, 9999))
         verification_codes[email] = code
         
-        print(f"\n=========================================")
-        print(f"🔥 КОД ПОДТВЕРЖДЕНИЯ ДЛЯ {email}: {code}")
-        print(f"=========================================\n")
+        # --- ОТПРАВКА ПИСЬМА ---
+        try:
+            msg = Message('Код подтверждения NEXUS Market', recipients=[email])
+            msg.body = f'Здравствуйте, {name}!\n\nВаш код подтверждения для регистрации: {code}\n\nЕсли вы не регистрировались на нашем сайте, просто проигнорируйте это письмо.'
+            mail.send(msg)
+            print(f"✅ Письмо отправлено на {email}")
+        except Exception as e:
+            print(f"❌ Ошибка почты: {e}")
+            flash('Ошибка сервера: не удалось отправить письмо. Проверьте правильность почты.', 'error')
+            return redirect(url_for('register'))
+        # -----------------------
         
         session['reg_name'] = name
         session['reg_email'] = email
