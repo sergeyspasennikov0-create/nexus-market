@@ -12,20 +12,27 @@
         <div class="container header-inner">
             <a href="/" class="logo">NEXUS<span>Market</span></a>
             <div class="search-bar">
-                <input type="text" placeholder="Поиск услуг и товаров...">
+                <input type="text" placeholder="Поиск...">
             </div>
             <div class="header-actions">
-                {% if session.get('user') %}
-                    <span class="user-email">{{ session['user'] }}</span>
+                <!-- ПРОВЕРКА: Если в сессии есть имя пользователя, показываем его -->
+                {% if session.get('user_name') %}
+                    <span class="user-email">Привет, <b>{{ session['user_name'] }}</b>!</span>
+                    
+                    <!-- Если роль админ, показываем кнопку Админки -->
+                    {% if session.get('user_role') == 'admin' %}
+                        <a href="/admin" class="btn-outline" style="border-color: #8b5cf6; color: #8b5cf6;">⚙️ Админка</a>
+                    {% endif %}
+                    
                     <a href="/logout" class="btn-outline">Выйти</a>
                 {% else %}
+                    <!-- Если не вошел, показываем кнопки входа -->
                     <a href="/login" class="btn-outline">Войти</a>
                     <a href="/register" class="btn-primary">Регистрация</a>
                 {% endif %}
             </div>
         </div>
     </header>
-
     <main>
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -34,12 +41,10 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
-
         {% block content %}{% endblock %}
     </main>
-
     <footer class="footer">
-        <p>&copy; 2026 NEXUS Market. Площадка для цифровых услуг и товаров.</p>
+        <p>&copy; 2026 NEXUS Market.</p>
     </footer>
 </body>
 </html>
