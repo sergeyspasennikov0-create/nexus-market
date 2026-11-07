@@ -2,17 +2,20 @@ import sqlite3
 import random
 import os
 import time
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+import uuid
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_mail import Mail, Message
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_vr_project'
 
-# --- НАСТРОЙКИ ПОЧТЫ ---
-app.config['MAIL_SERVER'] = 'smtp.mail.ru'
-app.config['MAIL_PORT'] = 465
-app.config['MAIL_USE_SSL'] = True
+CURRENT_VERSION = str(uuid.uuid4())
+
+# --- УНИВЕРСАЛЬНЫЕ НАСТРОЙКИ ПОЧТЫ ---
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.mail.ru')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 465))
+app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL', 'True') == 'True'
 app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USER')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASS')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USER')
@@ -26,18 +29,19 @@ SUPER_ADMIN_EMAIL = 'admin@nexus-market.ru'
 def init_db():
     conn = sqlite3.connect('store.db')
     c = conn.cursor()
-    # Создаем таблицу с колонкой notification (для уведомлений)
     c.execute('''CREATE TABLE IF NOT EXISTS users 
                  (id INTEGER PRIMARY KEY, name TEXT, email TEXT UNIQUE, phone TEXT, password TEXT, role TEXT, is_banned INTEGER DEFAULT 0, notification TEXT DEFAULT NULL)''')
-    
-    # Безопасное добавление колонки, если таблица уже существует (чтобы не было ошибок)
-    try:
-        c.execute("ALTER TABLE users ADD COLUMN notification TEXT DEFAULT NULL")
-    except sqlite3.OperationalError:
-        pass # Колонка уже есть
+    try: c.execute("ALTER TABLE users ADD COLUMN notification TEXT DEFAULT NULL")
+    except sqlite3.OperationalError: pass
 
+    # Убрали is_sold
     c.execute('''CREATE TABLE IF NOT EXISTS products 
                  (id INTEGER PRIMARY KEY, title TEXT, description TEXT, price INTEGER, icon TEXT, author_name TEXT)''')
+    
+    c.execute('''CREATE TABLE IF NOT EXISTS messages 
+                 (id INTEGER PRIMARY KEY, sender_name TEXT, sender_email TEXT, content TEXT, created_at TEXT, status TEXT DEFAULT 'new')''')
+    try: c.execute("ALTER TABLE messages ADD COLUMN status TEXT DEFAULT 'new'")
+    except sqlite3.OperationalError: pass
     
     c.execute("SELECT COUNT(*) FROM users WHERE email = ?", (SUPER_ADMIN_EMAIL,))
     if c.fetchone()[0] == 0:
@@ -58,19 +62,20 @@ def init_db():
 init_db()
 verification_codes = {}
 
-# --- ГЛОБАЛЬНАЯ ПРОВЕРКА УВЕДОМЛЕНИЙ ---
+@app.route('/api/version')
+def get_version():
+    return jsonify({"version": CURRENT_VERSION})
+
 @app.before_request
 def check_notifications():
-    if session.get('user_email') and request.endpoint != 'static':
+    if session.get('user_email') and request.endpoint not in ['static', 'get_version']:
         conn = sqlite3.connect('store.db')
         c = conn.cursor()
         c.execute("SELECT notification FROM users WHERE email = ?", (session['user_email'],))
         result = c.fetchone()
         
         if result and result[0]:
-            # Показываем уведомление
             flash(result[0], 'success')
-            # Очищаем уведомление в базе, чтобы оно не показывалось вечно
             c.execute("UPDATE users SET notification = NULL WHERE email = ?", (session['user_email'],))
             conn.commit()
         conn.close()
@@ -80,7 +85,7 @@ def check_maintenance():
     global MAINTENANCE_MODE
     if MAINTENANCE_MODE:
         if session.get('user_role') not in ['admin', 'super_admin']:
-            if request.endpoint not in ['maintenance', 'static']:
+            if request.endpoint not in ['maintenance', 'static', 'get_version']:
                 return render_template('maintenance.html'), 503
 
 @app.route('/maintenance')
@@ -92,12 +97,19 @@ def index():
     if MAINTENANCE_MODE and session.get('user_role') not in ['admin', 'super_admin']:
         return render_template('maintenance.html'), 503
         
+    search_query = request.args.get('q', '').strip()
+    
     conn = sqlite3.connect('store.db')
     c = conn.cursor()
-    c.execute("SELECT * FROM products")
+    
+    if search_query:
+        c.execute("SELECT * FROM products WHERE title LIKE ?", (f'%{search_query}%',))
+    else:
+        c.execute("SELECT * FROM products")
+        
     products = c.fetchall()
     conn.close()
-    return render_template('index.html', products=products)
+    return render_template('index.html', products=products, search_query=search_query)
 
 @app.route('/health')
 def health():
@@ -121,9 +133,10 @@ def register():
             msg = Message('Код NEXUS Market', recipients=[email])
             msg.body = f'Ваш код: {code}'
             mail.send(msg)
+            flash('Код отправлен на почту!', 'success')
         except Exception as e:
-            flash('Ошибка отправки почты. Проверьте адрес.', 'error')
-            return redirect(url_for('register'))
+            print(f"❌ ОШИБКА SMTP: {e}") 
+            flash(f'Почта временно недоступна. ВАШ ТЕСТОВЫЙ КОД: {code}', 'error')
         
         session['reg_name'] = name
         session['reg_email'] = email
@@ -207,6 +220,26 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
+@app.route('/support', methods=['GET', 'POST'])
+def support():
+    if not session.get('user_name'):
+        flash('Войдите, чтобы написать в поддержку!', 'error')
+        return redirect(url_for('login'))
+        
+    if request.method == 'POST':
+        content = request.form['content']
+        current_time = time.strftime('%d.%m.%Y %H:%M')
+        
+        conn = sqlite3.connect('store.db')
+        c = conn.cursor()
+        c.execute("INSERT INTO messages (sender_name, sender_email, content, created_at, status) VALUES (?, ?, ?, ?, 'new')", 
+                  (session['user_name'], session['user_email'], content, current_time))
+        conn.commit()
+        conn.close()
+        flash('Сообщение отправлено! Администрация скоро ответит.', 'success')
+        return redirect(url_for('index'))
+    return render_template('support.html')
+
 @app.route('/sell', methods=['GET', 'POST'])
 def sell():
     if not session.get('user_name'):
@@ -232,6 +265,7 @@ def admin():
     search_query = request.args.get('search', '').strip()
     conn = sqlite3.connect('store.db')
     c = conn.cursor()
+    
     c.execute("SELECT * FROM products")
     products = c.fetchall()
     
@@ -240,9 +274,13 @@ def admin():
     else:
         c.execute("SELECT id, name, email, phone, role, is_banned FROM users")
     users = c.fetchall()
+    
+    c.execute("SELECT * FROM messages ORDER BY id DESC")
+    messages = c.fetchall()
+    
     conn.close()
     
-    return render_template('admin.html', products=products, users=users, search_query=search_query, maintenance=MAINTENANCE_MODE)
+    return render_template('admin.html', products=products, users=users, search_query=search_query, maintenance=MAINTENANCE_MODE, messages=messages)
 
 @app.route('/add_product', methods=['POST'])
 def add_product():
@@ -262,6 +300,37 @@ def delete_product(id):
     conn = sqlite3.connect('store.db')
     c = conn.cursor()
     c.execute("DELETE FROM products WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('admin'))
+
+@app.route('/delete_message/<int:id>')
+def delete_message(id):
+    if session.get('user_role') not in ['admin', 'super_admin']: return redirect(url_for('index'))
+    conn = sqlite3.connect('store.db')
+    c = conn.cursor()
+    c.execute("DELETE FROM messages WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    flash('Сообщение удалено.', 'success')
+    return redirect(url_for('admin'))
+
+@app.route('/message/read/<int:id>')
+def mark_read(id):
+    if session.get('user_role') not in ['admin', 'super_admin']: return redirect(url_for('index'))
+    conn = sqlite3.connect('store.db')
+    c = conn.cursor()
+    c.execute("UPDATE messages SET status = 'read' WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('admin'))
+
+@app.route('/message/resolve/<int:id>')
+def mark_resolved(id):
+    if session.get('user_role') not in ['admin', 'super_admin']: return redirect(url_for('index'))
+    conn = sqlite3.connect('store.db')
+    c = conn.cursor()
+    c.execute("UPDATE messages SET status = 'resolved' WHERE id = ?", (id,))
     conn.commit()
     conn.close()
     return redirect(url_for('admin'))
@@ -299,7 +368,6 @@ def make_admin(id):
     if session.get('user_role') not in ['admin', 'super_admin']: return redirect(url_for('index'))
     conn = sqlite3.connect('store.db')
     c = conn.cursor()
-    # Выдаем роль И записываем уведомление
     c.execute("UPDATE users SET role = 'admin', notification = '🎉 Поздравляем! Вам выданы права администратора.' WHERE id = ?", (id,))
     conn.commit()
     conn.close()
@@ -318,7 +386,6 @@ def remove_admin(id):
     if target and target[0] == SUPER_ADMIN_EMAIL:
         flash('ОШИБКА: Нельзя снять права с Главного Босса!', 'error')
     else:
-        # Снимаем роль И записываем уведомление
         c.execute("UPDATE users SET role = 'user', notification = '⚠️ Ваши права администратора были сняты.' WHERE id = ?", (id,))
         conn.commit()
         flash('Права администратора сняты.', 'success')
