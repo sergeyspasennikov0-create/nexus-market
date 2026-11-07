@@ -38,7 +38,7 @@ a { text-decoration: none; color: inherit; }
 .stat-card h3 { color: #a1a1aa; font-size: 14px; margin-bottom: 10px; text-transform: uppercase; }
 .stat-card p { font-size: 32px; font-weight: 800; color: #8b5cf6; }
 
-/* Форма добавления */
+/* Формы */
 .add-form {
     background: #1a1d24; padding: 20px; border-radius: 12px; border: 1px solid #2a2e38;
     display: flex; gap: 10px; margin-bottom: 30px; flex-wrap: wrap;
@@ -50,7 +50,12 @@ a { text-decoration: none; color: inherit; }
 .btn-add { background: #8b5cf6; color: white; padding: 12px 25px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; transition: 0.3s; }
 .btn-add:hover { background: #7c3aed; }
 
-/* Таблица товаров */
+/* Поиск */
+.search-form { display: flex; align-items: center; gap: 10px; }
+.search-form input { width: 300px; padding: 10px 15px; background: #1a1d24; border: 1px solid #2a2e38; border-radius: 8px; color: white; outline: none; }
+.search-form input:focus { border-color: #8b5cf6; }
+
+/* Таблицы */
 .table-container { background: #1a1d24; border-radius: 12px; border: 1px solid #2a2e38; overflow: hidden; }
 table { width: 100%; border-collapse: collapse; text-align: left; }
 th, td { padding: 18px 20px; border-bottom: 1px solid #2a2e38; }
@@ -63,3 +68,8 @@ td { font-size: 15px; }
 .flash-msg { padding: 15px; text-align: center; font-weight: 600; border-radius: 8px; margin-bottom: 20px; }
 .flash-msg.success { background: #064e3b; color: #6ee7b7; }
 .flash-msg.error { background: #7f1d1d; color: #fca5a5; }
+
+/* Чекбокс (для страницы регистрации) */
+.checkbox-wrapper { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; text-align: left; }
+.checkbox-wrapper input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: #8b5cf6; }
+.checkbox-wrapper label { font-size: 13px; color: #a1a1aa; cursor: pointer; line-height: 1.2; }

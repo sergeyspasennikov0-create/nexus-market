@@ -8,8 +8,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 </head>
 <body>
-
-    <!-- Боковое меню -->
     <aside class="sidebar">
         <div class="sidebar-logo">NEXUS Admin</div>
         <a href="/admin" class="nav-item active">📊 Дашборд</a>
@@ -19,14 +17,12 @@
         </div>
     </aside>
 
-    <!-- Основной контент -->
     <main class="main-content">
         <div class="top-bar">
             <h1>Управление магазином</h1>
             <div style="color: #a1a1aa;">Вы вошли как: <b style="color: white;">{{ session['user_name'] }}</b></div>
         </div>
 
-        <!-- Уведомления -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -35,19 +31,18 @@
             {% endif %}
         {% endwith %}
 
-        <!-- Статистика -->
+        <!-- ТОВАРЫ -->
         <div class="stats-grid">
             <div class="stat-card">
                 <h3>Всего товаров</h3>
                 <p>{{ products|length }}</p>
             </div>
             <div class="stat-card">
-                <h3>Статус магазина</h3>
-                <p style="color: #10b981;">Активен</p>
+                <h3>Всего пользователей</h3>
+                <p style="color: #10b981;">{{ users|length }}</p>
             </div>
         </div>
 
-        <!-- Форма добавления -->
         <h2 style="margin-bottom: 15px; font-size: 20px;">Добавить новый товар</h2>
         <form method="POST" action="/add_product" class="add-form">
             <input type="text" name="title" placeholder="Название" required>
@@ -57,9 +52,8 @@
             <button type="submit" class="btn-add">+ Добавить</button>
         </form>
 
-        <!-- Таблица товаров -->
         <h2 style="margin-bottom: 15px; font-size: 20px;">Список товаров</h2>
-        <div class="table-container">
+        <div class="table-container" style="margin-bottom: 40px;">
             <table>
                 <thead>
                     <tr>
@@ -75,16 +69,65 @@
                         <td style="font-size: 24px;">{{ product[4] }}</td>
                         <td><b>{{ product[1] }}</b><br><small style="color: #a1a1aa;">{{ product[2] }}</small></td>
                         <td style="color: #8b5cf6; font-weight: bold;">{{ product[3] }} ₽</td>
-                        <td>
-                            <!-- Кнопка удаления -->
-                            <a href="/delete_product/{{ product[0] }}" class="btn-delete" onclick="return confirm('Удалить этот товар?')">Удалить</a>
-                        </td>
+                        <td><a href="/delete_product/{{ product[0] }}" class="btn-delete" onclick="return confirm('Удалить?')">Удалить</a></td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-    </main>
 
+        <!-- ПОЛЬЗОВАТЕЛИ -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2 style="font-size: 20px;">База пользователей</h2>
+            
+            <!-- ФОРМА ПОИСКА -->
+            <form method="GET" action="/admin" class="search-form">
+                <input type="text" name="search" placeholder="Поиск по имени, почте или телефону..." value="{{ search_query }}">
+                <button type="submit" class="btn-add" style="padding: 10px 20px;">Найти</button>
+                {% if search_query %}
+                    <a href="/admin" style="color: #ef4444; margin-left: 10px; text-decoration: none; font-weight: bold;">✕ Сбросить</a>
+                {% endif %}
+            </form>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Имя (Никнейм)</th>
+                        <th>Почта</th>
+                        <th>Телефон</th>
+                        <th>Роль</th>
+                        <th>Пароль (Зашифрован)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td style="color: #a1a1aa;">#{{ user[0] }}</td>
+                        <td><b>{{ user[1] }}</b></td>
+                        <td>{{ user[2] }}</td>
+                        <td>{{ user[3] }}</td>
+                        <td>
+                            {% if user[4] == 'admin' %}
+                                <span style="color: #8b5cf6; font-weight: bold;">Админ 👑</span>
+                            {% else %}
+                                <span style="color: #a1a1aa;">Покупатель</span>
+                            {% endif %}
+                        </td>
+                        <!-- ПОКАЗЫВАЕМ ОБРЕЗАННЫЙ ХЕШ ПАРОЛЯ -->
+                        <td><small style="color: #555; font-family: monospace;">{{ user[5][:20] }}...</small></td>
+                    </tr>
+                    {% endfor %}
+                    {% if not users %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: #a1a1aa;">Пользователи не найдены</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </main>
 </body>
 </html>

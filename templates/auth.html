@@ -11,10 +11,7 @@
                     <input type="password" name="password" id="login_password" placeholder="Пароль" required>
                     <span class="toggle-password" onclick="togglePassword('login_password')">👁️</span>
                 </div>
-                
-                <!-- Блок для таймера блокировки -->
                 <div id="timerDisplay" style="color: #ef4444; text-align: center; margin-bottom: 10px; font-weight: bold;"></div>
-                
                 <button type="submit" class="btn-primary full-width" id="loginBtn">Войти</button>
             </form>
         
@@ -25,6 +22,13 @@
                 <input type="text" name="name" placeholder="Ваше имя (Никнейм)" required>
                 <input type="email" name="email" placeholder="example@mail.ru" required>
                 <input type="tel" name="phone" placeholder="+7 (999) 123-45-67" required>
+                
+                <!-- ГАЛОЧКА СОГЛАСИЯ -->
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" name="consent" id="consent" required>
+                    <label for="consent">Я соглашаюсь на обработку персональных данных</label>
+                </div>
+
                 <button type="submit" class="btn-primary full-width">Получить код</button>
             </form>
             
@@ -50,28 +54,20 @@
     </div>
 </div>
 
-<!-- Скрипт для показа пароля -->
 <script>
 function togglePassword(inputId) {
     var input = document.getElementById(inputId);
-    if (input.type === "password") {
-        input.type = "text";
-    } else {
-        input.type = "password";
-    }
+    if (input.type === "password") { input.type = "text"; } else { input.type = "password"; }
 }
 </script>
 
-<!-- СКРИПТ ДЛЯ ТАЙМЕРА БЛОКИРОВКИ -->
 {% if lockout_time %}
 <script>
     var rawTime = "{{ lockout_time }}";
     var timeLeft = parseInt(rawTime) || 0;
-    
     var btn = document.getElementById('loginBtn');
     var timerDisplay = document.getElementById('timerDisplay');
     
-    // Блокируем кнопку
     btn.disabled = true;
     btn.style.opacity = '0.5';
     btn.style.cursor = 'not-allowed';
@@ -85,19 +81,14 @@ function togglePassword(inputId) {
             setTimeout(function() { timerDisplay.innerHTML = ''; }, 3000);
             return;
         }
-        
         var minutes = Math.floor(timeLeft / 60);
         var seconds = timeLeft % 60;
         var formattedSeconds = seconds < 10 ? '0' + seconds : seconds;
-        
         timerDisplay.innerHTML = 'Заблокировано. Осталось: ' + minutes + ':' + formattedSeconds;
-        
         timeLeft--;
         setTimeout(updateTimer, 1000);
     }
-    
     updateTimer();
 </script>
 {% endif %}
-
 {% endblock %}

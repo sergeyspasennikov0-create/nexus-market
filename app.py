@@ -19,7 +19,6 @@ app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USER')
 app.config['MAIL_SUPPRESS_SEND'] = False
 mail = Mail(app)
 
-# --- СИСТЕМА ЗАЩИТЫ (Словарь для хранения попыток) ---
 login_attempts = {}
 
 def init_db():
@@ -70,6 +69,11 @@ def health():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
+        # ПРОВЕРКА СОГЛАСИЯ НА ОБРАБОТКУ ДАННЫХ
+        if 'consent' not in request.form:
+            flash('Вы должны согласиться на обработку персональных данных!', 'error')
+            return redirect(url_for('register'))
+
         name = request.form['name']
         email = request.form['email']
         phone = request.form['phone']
@@ -151,7 +155,6 @@ def login():
     user_ip = request.remote_addr
     current_time = time.time()
 
-    # Проверка на блокировку
     if user_ip in login_attempts:
         lock_until = login_attempts[user_ip].get('lock_until', 0)
         if current_time < lock_until:
@@ -182,7 +185,7 @@ def login():
             login_attempts[user_ip]['count'] += 1
             
             if login_attempts[user_ip]['count'] >= 10:
-                login_attempts[user_ip]['lock_until'] = current_time + 1800 # 30 минут
+                login_attempts[user_ip]['lock_until'] = current_time + 1800
                 flash('Превышен лимит попыток! Вы заблокированы на 30 минут.', 'error')
                 return render_template('auth.html', mode='login', lockout_time=1800)
             else:
@@ -202,13 +205,27 @@ def admin():
         flash('У вас нет доступа к этой странице!', 'error')
         return redirect(url_for('index'))
     
+    # Поиск по пользователям
+    search_query = request.args.get('search', '').strip()
+    
     conn = sqlite3.connect('store.db')
     c = conn.cursor()
+    
+    # Получаем товары
     c.execute("SELECT * FROM products")
     products = c.fetchall()
+    
+    # Получаем пользователей (с поиском или без)
+    if search_query:
+        c.execute("SELECT id, name, email, phone, role, password FROM users WHERE name LIKE ? OR email LIKE ? OR phone LIKE ?", 
+                  (f'%{search_query}%', f'%{search_query}%', f'%{search_query}%'))
+    else:
+        c.execute("SELECT id, name, email, phone, role, password FROM users")
+    users = c.fetchall()
+    
     conn.close()
     
-    return render_template('admin.html', products=products)
+    return render_template('admin.html', products=products, users=users, search_query=search_query)
 
 @app.route('/add_product', methods=['POST'])
 def add_product():
