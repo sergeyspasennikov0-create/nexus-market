@@ -13,15 +13,17 @@
         
         {% elif mode == 'register' %}
             <h2>Создать аккаунт</h2>
-            <p class="auth-subtitle">Шаг 1 из 3: Введите вашу почту</p>
+            <p class="auth-subtitle">Шаг 1 из 3: Заполните данные</p>
             <form method="POST" action="/register">
+                <input type="text" name="name" placeholder="Ваше имя (Никнейм)" required>
                 <input type="email" name="email" placeholder="example@mail.ru" required>
+                <input type="tel" name="phone" placeholder="+7 (999) 123-45-67" required>
                 <button type="submit" class="btn-primary full-width">Получить код</button>
             </form>
             
         {% elif mode == 'verify' %}
             <h2>Проверка почты</h2>
-            <p class="auth-subtitle">Шаг 2 из 3: Введите код, который появился в терминале VS Code!</p>
+            <p class="auth-subtitle">Шаг 2 из 3: Введите код из логов сервера</p>
             <form method="POST" action="/verify">
                 <input type="text" name="code" placeholder="4-значный код" maxlength="4" required>
                 <button type="submit" class="btn-primary full-width">Подтвердить</button>
