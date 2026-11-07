@@ -11,22 +11,20 @@
     <header class="header">
         <div class="container header-inner">
             <a href="/" class="logo">NEXUS<span>Market</span></a>
-            <div class="search-bar">
-                <input type="text" placeholder="Поиск...">
-            </div>
+            
             <div class="header-actions">
-                <!-- ПРОВЕРКА: Если в сессии есть имя пользователя, показываем его -->
                 {% if session.get('user_name') %}
+                    <!-- Кнопка ПРОДАТЬ для обычных пользователей -->
+                    <a href="/sell" class="btn-primary" style="background: #10b981;">+ Продать</a>
+                    
                     <span class="user-email">Привет, <b>{{ session['user_name'] }}</b>!</span>
                     
-                    <!-- Если роль админ, показываем кнопку Админки -->
-                    {% if session.get('user_role') == 'admin' %}
+                    {% if session.get('user_role') in ['admin', 'super_admin'] %}
                         <a href="/admin" class="btn-outline" style="border-color: #8b5cf6; color: #8b5cf6;">⚙️ Админка</a>
                     {% endif %}
                     
                     <a href="/logout" class="btn-outline">Выйти</a>
                 {% else %}
-                    <!-- Если не вошел, показываем кнопки входа -->
                     <a href="/login" class="btn-outline">Войти</a>
                     <a href="/register" class="btn-primary">Регистрация</a>
                 {% endif %}

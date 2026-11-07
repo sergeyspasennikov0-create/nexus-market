@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="auth-container">
+    <div class="auth-box" style="max-width: 500px;">
+        <h2>Выставить товар на продажу</h2>
+        <form method="POST" action="/sell">
+            <input type="text" name="title" placeholder="Название" required>
+            <input type="text" name="description" placeholder="Описание" required>
+            <input type="number" name="price" placeholder="Цена (₽)" required>
+            <input type="text" name="icon" placeholder="Иконка (эмодзи)" required maxlength="2">
+            <button type="submit" class="btn-primary full-width">Опубликовать</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

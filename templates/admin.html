@@ -11,16 +11,27 @@
     <aside class="sidebar">
         <div class="sidebar-logo">NEXUS Admin</div>
         <a href="/admin" class="nav-item active">📊 Дашборд</a>
-        <a href="/" class="nav-item">🛒 Перейти на сайт</a>
-        <div class="sidebar-footer">
-            <a href="/logout" class="nav-item" style="color: #ef4444;">🚪 Выйти</a>
+        <a href="/" class="nav-item">🛒 На сайт</a>
+        
+        <!-- БЛОК УПРАВЛЕНИЯ СЕРВЕРОМ -->
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #2a2e38;">
+            <div style="color: #a1a1aa; font-size: 12px; margin-bottom: 10px; text-transform: uppercase;">Сервер</div>
+            <div style="font-size: 14px; margin-bottom: 10px;">Статус: 
+                {% if maintenance %}<span style="color: #ef4444;">ОСТАНОВЛЕН</span>{% else %}<span style="color: #10b981;">РАБОТАЕТ</span>{% endif %}
+            </div>
+            <form method="POST" action="/action/toggle_maintenance">
+                <input type="text" name="code" placeholder="Код (STOP-2026)" style="width: 100%; padding: 8px; background: #12151e; border: 1px solid #2a2e38; color: white; border-radius: 5px; margin-bottom: 5px;">
+                <button type="submit" class="btn-delete" style="width: 100%; padding: 8px; background: #ef4444; color: white;">
+                    {% if maintenance %}Включить{% else %}Остановить{% endif %}
+                </button>
+            </form>
         </div>
     </aside>
 
     <main class="main-content">
         <div class="top-bar">
             <h1>Управление магазином</h1>
-            <div style="color: #a1a1aa;">Вы вошли как: <b style="color: white;">{{ session['user_name'] }}</b></div>
+            <div style="color: #a1a1aa;">Босс: <b style="color: #8b5cf6;">{{ session['user_name'] }}</b></div>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -32,44 +43,26 @@
         {% endwith %}
 
         <!-- ТОВАРЫ -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>Всего товаров</h3>
-                <p>{{ products|length }}</p>
-            </div>
-            <div class="stat-card">
-                <h3>Всего пользователей</h3>
-                <p style="color: #10b981;">{{ users|length }}</p>
-            </div>
-        </div>
-
-        <h2 style="margin-bottom: 15px; font-size: 20px;">Добавить новый товар</h2>
+        <h2 style="margin-bottom: 15px; font-size: 20px;">Добавить товар от админа</h2>
         <form method="POST" action="/add_product" class="add-form">
             <input type="text" name="title" placeholder="Название" required>
             <input type="text" name="description" placeholder="Описание" required>
-            <input type="number" name="price" placeholder="Цена (₽)" required>
+            <input type="number" name="price" placeholder="Цена" required>
             <input type="text" name="icon" placeholder="Иконка" required maxlength="2">
             <button type="submit" class="btn-add">+ Добавить</button>
         </form>
 
-        <h2 style="margin-bottom: 15px; font-size: 20px;">Список товаров</h2>
         <div class="table-container" style="margin-bottom: 40px;">
             <table>
-                <thead>
-                    <tr>
-                        <th>Иконка</th>
-                        <th>Название</th>
-                        <th>Цена</th>
-                        <th>Действие</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>Иконка</th><th>Товар</th><th>Цена</th><th>Автор</th><th>Действие</th></tr></thead>
                 <tbody>
-                    {% for product in products %}
+                    {% for p in products %}
                     <tr>
-                        <td style="font-size: 24px;">{{ product[4] }}</td>
-                        <td><b>{{ product[1] }}</b><br><small style="color: #a1a1aa;">{{ product[2] }}</small></td>
-                        <td style="color: #8b5cf6; font-weight: bold;">{{ product[3] }} ₽</td>
-                        <td><a href="/delete_product/{{ product[0] }}" class="btn-delete" onclick="return confirm('Удалить?')">Удалить</a></td>
+                        <td style="font-size: 24px;">{{ p[4] }}</td>
+                        <td><b>{{ p[1] }}</b></td>
+                        <td style="color: #8b5cf6; font-weight: bold;">{{ p[3] }} ₽</td>
+                        <td style="color: #a1a1aa;">{{ p[5] }}</td>
+                        <td><a href="/delete_product/{{ p[0] }}" class="btn-delete" onclick="return confirm('Удалить?')">Удалить</a></td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -79,14 +72,9 @@
         <!-- ПОЛЬЗОВАТЕЛИ -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
             <h2 style="font-size: 20px;">База пользователей</h2>
-            
-            <!-- ФОРМА ПОИСКА -->
             <form method="GET" action="/admin" class="search-form">
-                <input type="text" name="search" placeholder="Поиск по имени, почте или телефону..." value="{{ search_query }}">
+                <input type="text" name="search" placeholder="Поиск..." value="{{ search_query }}">
                 <button type="submit" class="btn-add" style="padding: 10px 20px;">Найти</button>
-                {% if search_query %}
-                    <a href="/admin" style="color: #ef4444; margin-left: 10px; text-decoration: none; font-weight: bold;">✕ Сбросить</a>
-                {% endif %}
             </form>
         </div>
 
@@ -95,36 +83,51 @@
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>Имя (Никнейм)</th>
+                        <th>Имя</th>
                         <th>Почта</th>
-                        <th>Телефон</th>
                         <th>Роль</th>
-                        <th>Пароль (Зашифрован)</th>
+                        <th>Статус</th>
+                        <th>Действия</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for user in users %}
+                    {% for u in users %}
                     <tr>
-                        <td style="color: #a1a1aa;">#{{ user[0] }}</td>
-                        <td><b>{{ user[1] }}</b></td>
-                        <td>{{ user[2] }}</td>
-                        <td>{{ user[3] }}</td>
+                        <td style="color: #a1a1aa;">#{{ u[0] }}</td>
+                        <td><b>{{ u[1] }}</b></td>
+                        <td>{{ u[2] }}</td>
                         <td>
-                            {% if user[4] == 'admin' %}
-                                <span style="color: #8b5cf6; font-weight: bold;">Админ 👑</span>
+                            {% if u[4] == 'super_admin' %}
+                                <span style="color: #fbbf24; font-weight: bold;">👑 БОСС</span>
+                            {% elif u[4] == 'admin' %}
+                                <span style="color: #8b5cf6; font-weight: bold;">Админ</span>
                             {% else %}
-                                <span style="color: #a1a1aa;">Покупатель</span>
+                                <span style="color: #a1a1aa;">Юзер</span>
                             {% endif %}
                         </td>
-                        <!-- ПОКАЗЫВАЕМ ОБРЕЗАННЫЙ ХЕШ ПАРОЛЯ -->
-                        <td><small style="color: #555; font-family: monospace;">{{ user[5][:20] }}...</small></td>
+                        <td>
+                            {% if u[5] == 1 %}<span style="color: #ef4444;">Забанен</span>{% else %}<span style="color: #10b981;">Активен</span>{% endif %}
+                        </td>
+                        <td>
+                            <!-- ЗАЩИТА СУПЕР-АДМИНА -->
+                            {% if u[2] == 'admin@nexus-market.ru' %}
+                                <span style="color: #a1a1aa; font-size: 12px;">Неприкосновенен</span>
+                            {% else %}
+                                {% if u[4] == 'user' %}
+                                    <a href="/action/make_admin/{{ u[0] }}" style="color: #8b5cf6; margin-right: 10px;">Выдать Админку</a>
+                                {% else %}
+                                    <a href="/action/remove_admin/{{ u[0] }}" style="color: #fbbf24; margin-right: 10px;">Снять Админку</a>
+                                {% endif %}
+                                
+                                {% if u[5] == 1 %}
+                                    <a href="/action/unban/{{ u[0] }}" style="color: #10b981;">Разбанить</a>
+                                {% else %}
+                                    <a href="/action/ban/{{ u[0] }}" style="color: #ef4444;">Забанить</a>
+                                {% endif %}
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
-                    {% if not users %}
-                    <tr>
-                        <td colspan="6" style="text-align: center; color: #a1a1aa;">Пользователи не найдены</td>
-                    </tr>
-                    {% endif %}
                 </tbody>
             </table>
         </div>
