@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-box">
+        {% if mode == 'login' %}
+            <h2>Вход в аккаунт</h2>
+            <form method="POST" action="/login">
+                <input type="email" name="email" placeholder="Ваша почта" required>
+                <input type="password" name="password" placeholder="Пароль" required>
+                <button type="submit" class="btn-primary full-width">Войти</button>
+            </form>
+        
+        {% elif mode == 'register' %}
+            <h2>Создать аккаунт</h2>
+            <p class="auth-subtitle">Шаг 1 из 3: Введите вашу почту</p>
+            <form method="POST" action="/register">
+                <input type="email" name="email" placeholder="example@mail.ru" required>
+                <button type="submit" class="btn-primary full-width">Получить код</button>
+            </form>
+            
+        {% elif mode == 'verify' %}
+            <h2>Проверка почты</h2>
+            <p class="auth-subtitle">Шаг 2 из 3: Введите код, который появился в терминале VS Code!</p>
+            <form method="POST" action="/verify">
+                <input type="text" name="code" placeholder="4-значный код" maxlength="4" required>
+                <button type="submit" class="btn-primary full-width">Подтвердить</button>
+            </form>
+            
+        {% elif mode == 'password' %}
+            <h2>Придумайте пароль</h2>
+            <p class="auth-subtitle">Шаг 3 из 3: Создайте надежный пароль</p>
+            <form method="POST" action="/set_password">
+                <input type="password" name="password" placeholder="Минимум 6 символов" required>
+                <button type="submit" class="btn-primary full-width">Завершить регистрацию</button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

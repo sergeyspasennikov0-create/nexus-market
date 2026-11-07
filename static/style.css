@@ -1,0 +1,313 @@
+/* Общие настройки и сброс */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
+}
+
+body {
+    background-color: #0f1115;
+    color: #ffffff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+    width: 100%;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+main {
+    flex: 1;
+}
+
+/* --- Шапка сайта --- */
+.header {
+    background-color: #1a1d24;
+    border-bottom: 1px solid #2a2e38;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 70px;
+    gap: 20px;
+}
+
+.logo {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    color: #fff;
+}
+
+.logo span {
+    color: #8b5cf6; /* Фиолетовый акцент */
+}
+
+.search-bar input {
+    background: #0f1115;
+    border: 1px solid #2a2e38;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 8px;
+    width: 300px;
+    outline: none;
+    transition: 0.3s;
+}
+
+.search-bar input:focus {
+    border-color: #8b5cf6;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-email {
+    color: #a1a1aa;
+    font-size: 14px;
+}
+
+/* --- Кнопки --- */
+.btn-primary {
+    background: #8b5cf6;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.btn-primary:hover {
+    background: #7c3aed;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid #2a2e38;
+    color: #fff;
+    padding: 9px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: 0.3s;
+}
+
+.btn-outline:hover {
+    border-color: #8b5cf6;
+    color: #8b5cf6;
+}
+
+.full-width {
+    width: 100%;
+    margin-top: 10px;
+}
+
+/* --- Главный баннер --- */
+.hero-section {
+    background: linear-gradient(135deg, #1a1d24 0%, #0f1115 100%);
+    padding: 80px 0;
+    text-align: center;
+    border-bottom: 1px solid #2a2e38;
+}
+
+.hero-section h1 {
+    font-size: 42px;
+    font-weight: 800;
+    margin-bottom: 20px;
+}
+
+.hero-section h1 span {
+    color: #8b5cf6;
+}
+
+.hero-section p {
+    color: #a1a1aa;
+    font-size: 18px;
+}
+
+/* --- Сетка товаров --- */
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 25px;
+    padding: 40px 20px;
+}
+
+.product-card {
+    background: #1a1d24;
+    border: 1px solid #2a2e38;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: 0.3s;
+    display: flex;
+    flex-direction: column;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+    border-color: #8b5cf6;
+    box-shadow: 0 10px 30px rgba(139, 92, 246, 0.1);
+}
+
+.product-icon {
+    font-size: 60px;
+    text-align: center;
+    padding: 30px 0;
+    background: #0f1115;
+    border-bottom: 1px solid #2a2e38;
+}
+
+.product-info {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.product-info h3 {
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+
+.product-info p {
+    color: #a1a1aa;
+    font-size: 14px;
+    margin-bottom: 20px;
+    flex: 1;
+}
+
+.product-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.price {
+    font-size: 20px;
+    font-weight: 800;
+    color: #8b5cf6;
+}
+
+.btn-buy {
+    background: #2a2e38;
+    color: #fff;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: 0.3s;
+}
+
+.btn-buy:hover {
+    background: #8b5cf6;
+}
+
+/* --- Формы авторизации --- */
+.auth-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 140px);
+    padding: 20px;
+}
+
+.auth-box {
+    background: #1a1d24;
+    padding: 40px;
+    border-radius: 16px;
+    border: 1px solid #2a2e38;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.auth-box h2 {
+    font-size: 24px;
+    margin-bottom: 10px;
+    text-align: center;
+}
+
+.auth-subtitle {
+    color: #a1a1aa;
+    text-align: center;
+    font-size: 14px;
+    margin-bottom: 25px;
+}
+
+.auth-box input {
+    width: 100%;
+    padding: 14px;
+    background: #0f1115;
+    border: 1px solid #2a2e38;
+    border-radius: 8px;
+    color: #fff;
+    margin-bottom: 15px;
+    outline: none;
+    font-size: 16px;
+    transition: 0.3s;
+}
+
+.auth-box input:focus {
+    border-color: #8b5cf6;
+}
+
+/* --- Системные уведомления --- */
+.flash-msg {
+    padding: 15px;
+    text-align: center;
+    font-weight: 600;
+}
+
+.flash-msg.error {
+    background: #7f1d1d;
+    color: #fca5a5;
+}
+
+.flash-msg.success {
+    background: #064e3b;
+    color: #6ee7b7;
+}
+
+/* --- Подвал --- */
+.footer {
+    background: #1a1d24;
+    padding: 20px;
+    text-align: center;
+    color: #a1a1aa;
+    font-size: 14px;
+    border-top: 1px solid #2a2e38;
+}
+
+/* --- Адаптив для телефонов --- */
+@media (max-width: 768px) {
+    .header-inner {
+        flex-direction: column;
+        height: auto;
+        padding: 15px 0;
+    }
+    .search-bar input {
+        width: 100%;
+    }
+    .hero-section h1 {
+        font-size: 28px;
+    }
+}

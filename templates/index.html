@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="hero-section">
+    <div class="container">
+        <h1>Маркетплейс <span>цифровых товаров</span> и услуг</h1>
+        <p>Покупай аккаунты, заказывай разработку или приобретай VR-технику.</p>
+    </div>
+</div>
+
+<div class="container product-grid">
+    {% for product in products %}
+    <div class="product-card">
+        <div class="product-icon">{{ product[4] }}</div>
+        <div class="product-info">
+            <h3>{{ product[1] }}</h3>
+            <p>{{ product[2] }}</p>
+            <div class="product-bottom">
+                <span class="price">{{ product[3] }} ₽</span>
+                <button class="btn-buy" onclick="alert('Оплата временно недоступна (демо-режим)!')">Купить</button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
