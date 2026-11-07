@@ -15,14 +15,13 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS products 
                  (id INTEGER PRIMARY KEY, title TEXT, description TEXT, price INTEGER, icon TEXT)''')
     
-    # Проверяем, есть ли такой админ. Если нет - создаем. Если есть - сбрасываем пароль на 123456
+    # Принудительно ставим пароль 123456 для главного админа
     c.execute("SELECT COUNT(*) FROM users WHERE email = 'admin@nexus-market.ru'")
     if c.fetchone()[0] == 0:
         default_pw = generate_password_hash('123456')
         c.execute("INSERT INTO users (name, email, phone, password, role) VALUES (?, ?, ?, ?, ?)", 
                   ('Главный Админ', 'admin@nexus-market.ru', '+7 999 123-45-67', default_pw, 'admin'))
     else:
-        # Принудительно меняем пароль на 123456
         default_pw = generate_password_hash('123456')
         c.execute("UPDATE users SET password = ? WHERE email = 'admin@nexus-market.ru'", (default_pw,))
 
@@ -156,7 +155,14 @@ def admin():
     if session.get('user_role') != 'admin':
         flash('У вас нет доступа к этой странице!', 'error')
         return redirect(url_for('index'))
-    return render_template('admin.html')
+    
+    conn = sqlite3.connect('store.db')
+    c = conn.cursor()
+    c.execute("SELECT * FROM products")
+    products = c.fetchall()
+    conn.close()
+    
+    return render_template('admin.html', products=products)
 
 @app.route('/add_product', methods=['POST'])
 def add_product():
@@ -176,6 +182,20 @@ def add_product():
     conn.close()
     
     flash('Товар успешно добавлен!', 'success')
+    return redirect(url_for('admin'))
+
+@app.route('/delete_product/<int:id>')
+def delete_product(id):
+    if session.get('user_role') != 'admin':
+        return redirect(url_for('index'))
+        
+    conn = sqlite3.connect('store.db')
+    c = conn.cursor()
+    c.execute("DELETE FROM products WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    
+    flash('Товар удален!', 'success')
     return redirect(url_for('admin'))
 
 if __name__ == '__main__':

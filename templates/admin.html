@@ -1,19 +1,90 @@
-{% extends 'base.html' %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель | NEXUS Market</title>
+    <link rel="stylesheet" href="/static/admin.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
 
-{% block content %}
-<div class="auth-container">
-    <div class="auth-box" style="max-width: 600px;">
-        <h2>⚙️ Панель Администратора</h2>
-        <p class="auth-subtitle">Добавление нового товара в NEXUS Market</p>
-        
-        <form method="POST" action="/add_product">
-            <input type="text" name="title" placeholder="Название товара" required>
-            <input type="text" name="description" placeholder="Краткое описание" required>
-            <input type="number" name="price" placeholder="Цена (в рублях)" required>
-            <input type="text" name="icon" placeholder="Иконка (например: 🎮 или 🥽)" required maxlength="2">
-            
-            <button type="submit" class="btn-primary full-width">Добавить товар на сайт</button>
+    <!-- Боковое меню -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">NEXUS Admin</div>
+        <a href="/admin" class="nav-item active">📊 Дашборд</a>
+        <a href="/" class="nav-item">🛒 Перейти на сайт</a>
+        <div class="sidebar-footer">
+            <a href="/logout" class="nav-item" style="color: #ef4444;">🚪 Выйти</a>
+        </div>
+    </aside>
+
+    <!-- Основной контент -->
+    <main class="main-content">
+        <div class="top-bar">
+            <h1>Управление магазином</h1>
+            <div style="color: #a1a1aa;">Вы вошли как: <b style="color: white;">{{ session['user_name'] }}</b></div>
+        </div>
+
+        <!-- Уведомления -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-msg {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Статистика -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Всего товаров</h3>
+                <p>{{ products|length }}</p>
+            </div>
+            <div class="stat-card">
+                <h3>Статус магазина</h3>
+                <p style="color: #10b981;">Активен</p>
+            </div>
+        </div>
+
+        <!-- Форма добавления -->
+        <h2 style="margin-bottom: 15px; font-size: 20px;">Добавить новый товар</h2>
+        <form method="POST" action="/add_product" class="add-form">
+            <input type="text" name="title" placeholder="Название" required>
+            <input type="text" name="description" placeholder="Описание" required>
+            <input type="number" name="price" placeholder="Цена (₽)" required>
+            <input type="text" name="icon" placeholder="Иконка" required maxlength="2">
+            <button type="submit" class="btn-add">+ Добавить</button>
         </form>
-    </div>
-</div>
-{% endblock %}
+
+        <!-- Таблица товаров -->
+        <h2 style="margin-bottom: 15px; font-size: 20px;">Список товаров</h2>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Иконка</th>
+                        <th>Название</th>
+                        <th>Цена</th>
+                        <th>Действие</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr>
+                        <td style="font-size: 24px;">{{ product[4] }}</td>
+                        <td><b>{{ product[1] }}</b><br><small style="color: #a1a1aa;">{{ product[2] }}</small></td>
+                        <td style="color: #8b5cf6; font-weight: bold;">{{ product[3] }} ₽</td>
+                        <td>
+                            <!-- Кнопка удаления -->
+                            <a href="/delete_product/{{ product[0] }}" class="btn-delete" onclick="return confirm('Удалить этот товар?')">Удалить</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+</body>
+</html>
