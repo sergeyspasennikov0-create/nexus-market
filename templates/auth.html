@@ -7,7 +7,10 @@
             <h2>Вход в аккаунт</h2>
             <form method="POST" action="/login">
                 <input type="email" name="email" placeholder="Ваша почта" required>
-                <input type="password" name="password" placeholder="Пароль" required>
+                <div class="password-wrapper">
+                    <input type="password" name="password" id="login_password" placeholder="Пароль" required>
+                    <span class="toggle-password" onclick="togglePassword('login_password')">👁️</span>
+                </div>
                 <button type="submit" class="btn-primary full-width">Войти</button>
             </form>
         
@@ -33,10 +36,25 @@
             <h2>Придумайте пароль</h2>
             <p class="auth-subtitle">Шаг 3 из 3: Создайте надежный пароль</p>
             <form method="POST" action="/set_password">
-                <input type="password" name="password" placeholder="Минимум 6 символов" required>
+                <div class="password-wrapper">
+                    <input type="password" name="password" id="reg_password" placeholder="Минимум 6 символов" required>
+                    <span class="toggle-password" onclick="togglePassword('reg_password')">👁️</span>
+                </div>
                 <button type="submit" class="btn-primary full-width">Завершить регистрацию</button>
             </form>
         {% endif %}
     </div>
 </div>
+
+<!-- Скрипт для показа пароля -->
+<script>
+function togglePassword(inputId) {
+    var input = document.getElementById(inputId);
+    if (input.type === "password") {
+        input.type = "text";
+    } else {
+        input.type = "password";
+    }
+}
+</script>
 {% endblock %}
