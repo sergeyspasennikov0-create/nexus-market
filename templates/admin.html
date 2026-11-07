@@ -13,25 +13,45 @@
         <a href="/admin" class="nav-item active">📊 Дашборд</a>
         <a href="/" class="nav-item">🛒 На сайт</a>
         
-        <!-- БЛОК УПРАВЛЕНИЯ СЕРВЕРОМ -->
+        {% if session.get('user_role') == 'super_admin' %}
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #2a2e38;">
-            <div style="color: #a1a1aa; font-size: 12px; margin-bottom: 10px; text-transform: uppercase;">Сервер</div>
-            <div style="font-size: 14px; margin-bottom: 10px;">Статус: 
+            <div style="color: #fbbf24; font-size: 12px; margin-bottom: 10px; text-transform: uppercase; font-weight: bold;">👑 Панель Босса</div>
+            <div style="font-size: 14px; margin-bottom: 10px;">Сервер: 
                 {% if maintenance %}<span style="color: #ef4444;">ОСТАНОВЛЕН</span>{% else %}<span style="color: #10b981;">РАБОТАЕТ</span>{% endif %}
             </div>
+            
             <form method="POST" action="/action/toggle_maintenance">
-                <input type="text" name="code" placeholder="Код (STOP-2026)" style="width: 100%; padding: 8px; background: #12151e; border: 1px solid #2a2e38; color: white; border-radius: 5px; margin-bottom: 5px;">
-                <button type="submit" class="btn-delete" style="width: 100%; padding: 8px; background: #ef4444; color: white;">
-                    {% if maintenance %}Включить{% else %}Остановить{% endif %}
+                <input type="text" name="code" id="stopCode" placeholder="Код (STOP-2026)" style="width: 100%; padding: 8px; background: #12151e; border: 1px solid #2a2e38; color: white; border-radius: 5px; margin-bottom: 10px;" autocomplete="off">
+                <button type="submit" id="confirmStopBtn" class="btn-delete" style="display: none; width: 100%; padding: 10px; background: #ef4444; color: white; border: 2px solid #ff0000; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);">
+                    ⚠️ ПОДТВЕРДИТЬ
                 </button>
             </form>
+            
+            <script>
+                document.getElementById('stopCode').addEventListener('input', function() {
+                    var btn = document.getElementById('confirmStopBtn');
+                    if (this.value === 'STOP-2026') {
+                        btn.style.display = 'block';
+                    } else {
+                        btn.style.display = 'none';
+                    }
+                });
+            </script>
         </div>
+        {% endif %}
     </aside>
 
     <main class="main-content">
         <div class="top-bar">
             <h1>Управление магазином</h1>
-            <div style="color: #a1a1aa;">Босс: <b style="color: #8b5cf6;">{{ session['user_name'] }}</b></div>
+            <div style="color: #a1a1aa;">
+                Вы вошли как: 
+                {% if session.get('user_role') == 'super_admin' %}
+                    <b style="color: #fbbf24;">👑 {{ session['user_name'] }} (Босс)</b>
+                {% else %}
+                    <b style="color: #8b5cf6;">{{ session['user_name'] }} (Админ)</b>
+                {% endif %}
+            </div>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -43,7 +63,7 @@
         {% endwith %}
 
         <!-- ТОВАРЫ -->
-        <h2 style="margin-bottom: 15px; font-size: 20px;">Добавить товар от админа</h2>
+        <h2 style="margin-bottom: 15px; font-size: 20px;">Добавить товар от администрации</h2>
         <form method="POST" action="/add_product" class="add-form">
             <input type="text" name="title" placeholder="Название" required>
             <input type="text" name="description" placeholder="Описание" required>
@@ -109,14 +129,19 @@
                             {% if u[5] == 1 %}<span style="color: #ef4444;">Забанен</span>{% else %}<span style="color: #10b981;">Активен</span>{% endif %}
                         </td>
                         <td>
-                            <!-- ЗАЩИТА СУПЕР-АДМИНА -->
                             {% if u[2] == 'admin@nexus-market.ru' %}
-                                <span style="color: #a1a1aa; font-size: 12px;">Неприкосновенен</span>
+                                <span style="color: #fbbf24; font-size: 12px; font-weight: bold;">👑 Неприкосновенен</span>
                             {% else %}
+                                
                                 {% if u[4] == 'user' %}
-                                    <a href="/action/make_admin/{{ u[0] }}" style="color: #8b5cf6; margin-right: 10px;">Выдать Админку</a>
+                                    <!-- Кнопка с подтверждением (confirm) -->
+                                    <a href="/action/make_admin/{{ u[0] }}" 
+                                       onclick="return confirm('Вы уверены, что хотите выдать права администратора пользователю {{ u[1] }}?');" 
+                                       style="color: #8b5cf6; margin-right: 10px; font-weight: bold; text-decoration: underline;">
+                                       Сделать админом
+                                    </a>
                                 {% else %}
-                                    <a href="/action/remove_admin/{{ u[0] }}" style="color: #fbbf24; margin-right: 10px;">Снять Админку</a>
+                                    <a href="/action/remove_admin/{{ u[0] }}" style="color: #fbbf24; margin-right: 10px;">Снять админку</a>
                                 {% endif %}
                                 
                                 {% if u[5] == 1 %}

@@ -2,7 +2,7 @@ import sqlite3
 import random
 import os
 import time
-from flask import Flask, render_template, request, redirect, url_for, session, flash, abort
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_mail import Mail, Message
 
@@ -20,20 +20,25 @@ app.config['MAIL_SUPPRESS_SEND'] = False
 mail = Mail(app)
 
 login_attempts = {}
-MAINTENANCE_MODE = False # Глобальный переключатель обслуживания
-SUPER_ADMIN_EMAIL = 'admin@nexus-market.ru' # Твой неприкосновенный аккаунт
+MAINTENANCE_MODE = False
+SUPER_ADMIN_EMAIL = 'admin@nexus-market.ru'
 
 def init_db():
     conn = sqlite3.connect('store.db')
     c = conn.cursor()
-    # Обновленная таблица пользователей (добавлен статус бана)
+    # Создаем таблицу с колонкой notification (для уведомлений)
     c.execute('''CREATE TABLE IF NOT EXISTS users 
-                 (id INTEGER PRIMARY KEY, name TEXT, email TEXT UNIQUE, phone TEXT, password TEXT, role TEXT, is_banned INTEGER DEFAULT 0)''')
-    # Обновленная таблица товаров (добавлен ID автора)
+                 (id INTEGER PRIMARY KEY, name TEXT, email TEXT UNIQUE, phone TEXT, password TEXT, role TEXT, is_banned INTEGER DEFAULT 0, notification TEXT DEFAULT NULL)''')
+    
+    # Безопасное добавление колонки, если таблица уже существует (чтобы не было ошибок)
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN notification TEXT DEFAULT NULL")
+    except sqlite3.OperationalError:
+        pass # Колонка уже есть
+
     c.execute('''CREATE TABLE IF NOT EXISTS products 
                  (id INTEGER PRIMARY KEY, title TEXT, description TEXT, price INTEGER, icon TEXT, author_name TEXT)''')
     
-    # Проверяем, есть ли Супер-Админ
     c.execute("SELECT COUNT(*) FROM users WHERE email = ?", (SUPER_ADMIN_EMAIL,))
     if c.fetchone()[0] == 0:
         default_pw = generate_password_hash('123456')
@@ -53,12 +58,27 @@ def init_db():
 init_db()
 verification_codes = {}
 
-# Проверка режима обслуживания перед каждым запросом
+# --- ГЛОБАЛЬНАЯ ПРОВЕРКА УВЕДОМЛЕНИЙ ---
+@app.before_request
+def check_notifications():
+    if session.get('user_email') and request.endpoint != 'static':
+        conn = sqlite3.connect('store.db')
+        c = conn.cursor()
+        c.execute("SELECT notification FROM users WHERE email = ?", (session['user_email'],))
+        result = c.fetchone()
+        
+        if result and result[0]:
+            # Показываем уведомление
+            flash(result[0], 'success')
+            # Очищаем уведомление в базе, чтобы оно не показывалось вечно
+            c.execute("UPDATE users SET notification = NULL WHERE email = ?", (session['user_email'],))
+            conn.commit()
+        conn.close()
+
 @app.before_request
 def check_maintenance():
     global MAINTENANCE_MODE
     if MAINTENANCE_MODE:
-        # Если сайт выключен, пускаем только админов на их страницы
         if session.get('user_role') not in ['admin', 'super_admin']:
             if request.endpoint not in ['maintenance', 'static']:
                 return render_template('maintenance.html'), 503
@@ -161,7 +181,7 @@ def login():
         conn.close()
         
         if user:
-            if user[3] == 1: # Если забанен
+            if user[3] == 1:
                 flash('Ваш аккаунт заблокирован администрацией!', 'error')
                 return render_template('auth.html', mode='login')
                 
@@ -172,7 +192,6 @@ def login():
                 session['user_email'] = email
                 return redirect(url_for('index'))
         
-        # Если не пустило
         if user_ip not in login_attempts: login_attempts[user_ip] = {'count': 0, 'lock_until': 0}
         login_attempts[user_ip]['count'] += 1
         if login_attempts[user_ip]['count'] >= 10:
@@ -188,7 +207,6 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
-# --- ЛИЧНЫЙ КАБИНЕТ (Продажа для пользователей) ---
 @app.route('/sell', methods=['GET', 'POST'])
 def sell():
     if not session.get('user_name'):
@@ -206,7 +224,6 @@ def sell():
         return redirect(url_for('index'))
     return render_template('sell.html')
 
-# --- АДМИНКА ---
 @app.route('/admin')
 def admin():
     if session.get('user_role') not in ['admin', 'super_admin']:
@@ -249,18 +266,16 @@ def delete_product(id):
     conn.close()
     return redirect(url_for('admin'))
 
-# --- ДЕЙСТВИЯ С ПОЛЬЗОВАТЕЛЯМИ (ЗАЩИТА СУПЕР-АДМИНА) ---
 @app.route('/action/ban/<int:id>')
 def ban_user(id):
     if session.get('user_role') not in ['admin', 'super_admin']: return redirect(url_for('index'))
     
     conn = sqlite3.connect('store.db')
     c = conn.cursor()
-    # Проверяем почту того, кого банят. Если это Супер-Админ - запрещаем.
     c.execute("SELECT email FROM users WHERE id = ?", (id,))
-    target_email = c.fetchone()[0]
+    target = c.fetchone()
     
-    if target_email == SUPER_ADMIN_EMAIL:
+    if target and target[0] == SUPER_ADMIN_EMAIL:
         flash('ОШИБКА: Вы не можете забанить Главного Босса!', 'error')
     else:
         c.execute("UPDATE users SET is_banned = 1 WHERE id = ?", (id,))
@@ -284,7 +299,8 @@ def make_admin(id):
     if session.get('user_role') not in ['admin', 'super_admin']: return redirect(url_for('index'))
     conn = sqlite3.connect('store.db')
     c = conn.cursor()
-    c.execute("UPDATE users SET role = 'admin' WHERE id = ?", (id,))
+    # Выдаем роль И записываем уведомление
+    c.execute("UPDATE users SET role = 'admin', notification = '🎉 Поздравляем! Вам выданы права администратора.' WHERE id = ?", (id,))
     conn.commit()
     conn.close()
     flash('Права администратора выданы.', 'success')
@@ -297,25 +313,27 @@ def remove_admin(id):
     conn = sqlite3.connect('store.db')
     c = conn.cursor()
     c.execute("SELECT email FROM users WHERE id = ?", (id,))
-    target_email = c.fetchone()[0]
+    target = c.fetchone()
     
-    if target_email == SUPER_ADMIN_EMAIL:
+    if target and target[0] == SUPER_ADMIN_EMAIL:
         flash('ОШИБКА: Нельзя снять права с Главного Босса!', 'error')
     else:
-        c.execute("UPDATE users SET role = 'user' WHERE id = ?", (id,))
+        # Снимаем роль И записываем уведомление
+        c.execute("UPDATE users SET role = 'user', notification = '⚠️ Ваши права администратора были сняты.' WHERE id = ?", (id,))
         conn.commit()
         flash('Права администратора сняты.', 'success')
     conn.close()
     return redirect(url_for('admin'))
 
-# --- УПРАВЛЕНИЕ СЕРВЕРОМ ---
 @app.route('/action/toggle_maintenance', methods=['POST'])
 def toggle_maintenance():
     global MAINTENANCE_MODE
-    if session.get('user_role') not in ['admin', 'super_admin']: return redirect(url_for('index'))
-    
+    if session.get('user_role') != 'super_admin':
+        flash('ОШИБКА: У вас нет прав для управления сервером!', 'error')
+        return redirect(url_for('admin'))
+        
     code = request.form.get('code')
-    if code == 'STOP-2026': # Секретный код для остановки
+    if code == 'STOP-2026':
         MAINTENANCE_MODE = not MAINTENANCE_MODE
         status = "ВКЛЮЧЕН" if MAINTENANCE_MODE else "ВЫКЛЮЧЕН"
         flash(f'Режим обслуживания {status}.', 'success')
