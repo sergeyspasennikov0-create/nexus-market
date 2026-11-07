@@ -1,6 +1,7 @@
 import sqlite3
 import random
 import os
+import time
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_mail import Mail, Message
@@ -16,8 +17,10 @@ app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USER')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASS')
 app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USER')
 app.config['MAIL_SUPPRESS_SEND'] = False
-
 mail = Mail(app)
+
+# --- СИСТЕМА ЗАЩИТЫ (Словарь для хранения попыток) ---
+login_attempts = {}
 
 def init_db():
     conn = sqlite3.connect('store.db')
@@ -74,17 +77,15 @@ def register():
         code = str(random.randint(1000, 9999))
         verification_codes[email] = code
         
-        # --- ОТПРАВКА ПИСЬМА ---
         try:
             msg = Message('Код подтверждения NEXUS Market', recipients=[email])
-            msg.body = f'Здравствуйте, {name}!\n\nВаш код подтверждения для регистрации: {code}\n\nЕсли вы не регистрировались на нашем сайте, просто проигнорируйте это письмо.'
+            msg.body = f'Здравствуйте, {name}!\n\nВаш код подтверждения для регистрации: {code}'
             mail.send(msg)
             print(f"✅ Письмо отправлено на {email}")
         except Exception as e:
             print(f"❌ Ошибка почты: {e}")
             flash('Ошибка сервера: не удалось отправить письмо. Проверьте правильность почты.', 'error')
             return redirect(url_for('register'))
-        # -----------------------
         
         session['reg_name'] = name
         session['reg_email'] = email
@@ -147,6 +148,17 @@ def set_password():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    user_ip = request.remote_addr
+    current_time = time.time()
+
+    # Проверка на блокировку
+    if user_ip in login_attempts:
+        lock_until = login_attempts[user_ip].get('lock_until', 0)
+        if current_time < lock_until:
+            remaining = int(lock_until - current_time)
+            flash(f'Превышен лимит попыток! Попробуйте через {remaining // 60} мин. {remaining % 60} сек.', 'error')
+            return render_template('auth.html', mode='login', lockout_time=remaining)
+
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
@@ -157,11 +169,26 @@ def login():
         conn.close()
         
         if user and check_password_hash(user[1], password):
+            if user_ip in login_attempts:
+                login_attempts[user_ip]['count'] = 0
+                
             session['user_name'] = user[0]
             session['user_role'] = user[2]
             return redirect(url_for('index'))
         else:
-            flash('Неверная почта или пароль', 'error')
+            if user_ip not in login_attempts:
+                login_attempts[user_ip] = {'count': 0, 'lock_until': 0}
+            
+            login_attempts[user_ip]['count'] += 1
+            
+            if login_attempts[user_ip]['count'] >= 10:
+                login_attempts[user_ip]['lock_until'] = current_time + 1800 # 30 минут
+                flash('Превышен лимит попыток! Вы заблокированы на 30 минут.', 'error')
+                return render_template('auth.html', mode='login', lockout_time=1800)
+            else:
+                attempts_left = 10 - login_attempts[user_ip]['count']
+                flash(f'Неверная почта или пароль. Осталось попыток: {attempts_left}', 'error')
+
     return render_template('auth.html', mode='login')
 
 @app.route('/logout')

@@ -11,7 +11,11 @@
                     <input type="password" name="password" id="login_password" placeholder="Пароль" required>
                     <span class="toggle-password" onclick="togglePassword('login_password')">👁️</span>
                 </div>
-                <button type="submit" class="btn-primary full-width">Войти</button>
+                
+                <!-- Блок для таймера блокировки -->
+                <div id="timerDisplay" style="color: #ef4444; text-align: center; margin-bottom: 10px; font-weight: bold;"></div>
+                
+                <button type="submit" class="btn-primary full-width" id="loginBtn">Войти</button>
             </form>
         
         {% elif mode == 'register' %}
@@ -57,4 +61,43 @@ function togglePassword(inputId) {
     }
 }
 </script>
+
+<!-- СКРИПТ ДЛЯ ТАЙМЕРА БЛОКИРОВКИ -->
+{% if lockout_time %}
+<script>
+    var rawTime = "{{ lockout_time }}";
+    var timeLeft = parseInt(rawTime) || 0;
+    
+    var btn = document.getElementById('loginBtn');
+    var timerDisplay = document.getElementById('timerDisplay');
+    
+    // Блокируем кнопку
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'not-allowed';
+
+    function updateTimer() {
+        if (timeLeft <= 0) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+            timerDisplay.innerHTML = 'Блокировка снята!';
+            setTimeout(function() { timerDisplay.innerHTML = ''; }, 3000);
+            return;
+        }
+        
+        var minutes = Math.floor(timeLeft / 60);
+        var seconds = timeLeft % 60;
+        var formattedSeconds = seconds < 10 ? '0' + seconds : seconds;
+        
+        timerDisplay.innerHTML = 'Заблокировано. Осталось: ' + minutes + ':' + formattedSeconds;
+        
+        timeLeft--;
+        setTimeout(updateTimer, 1000);
+    }
+    
+    updateTimer();
+</script>
+{% endif %}
+
 {% endblock %}
