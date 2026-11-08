@@ -3,20 +3,22 @@ import random
 import os
 import time
 import uuid
-import resend
+import requests
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
+from email_validator import validate_email, EmailNotValidError
+import phonenumbers
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_vr_project'
 
 CURRENT_VERSION = str(uuid.uuid4())
 
-# --- НАСТРОЙКА RESEND ---
-resend.api_key = os.environ.get('RESEND_API_KEY')
-# ----------------------------------------
+# --- НАСТРОЙКА BREVO ---
+BREVO_API_KEY = os.environ.get('BREVO_API_KEY')
+SENDER_EMAIL = os.environ.get('MAIL_USER')
+# -----------------------
 
-login_attempts = {}
 MAINTENANCE_MODE = False
 SUPER_ADMIN_EMAIL = 'admin@nexus-market.ru'
 
@@ -35,6 +37,10 @@ def init_db():
                  (id INTEGER PRIMARY KEY, sender_name TEXT, sender_email TEXT, content TEXT, created_at TEXT, status TEXT DEFAULT 'new')''')
     try: c.execute("ALTER TABLE messages ADD COLUMN status TEXT DEFAULT 'new'")
     except sqlite3.OperationalError: pass
+
+    # НОВАЯ ТАБЛИЦА ДЛЯ ЗАЩИТЫ ОТ ВЗЛОМА (чтобы не сбрасывалась)
+    c.execute('''CREATE TABLE IF NOT EXISTS login_attempts 
+                 (ip TEXT PRIMARY KEY, count INTEGER DEFAULT 0, lock_until REAL DEFAULT 0)''')
     
     c.execute("SELECT COUNT(*) FROM users WHERE email = ?", (SUPER_ADMIN_EMAIL,))
     if c.fetchone()[0] == 0:
@@ -88,11 +94,15 @@ def maintenance():
 def index():
     if MAINTENANCE_MODE and session.get('user_role') not in ['admin', 'super_admin']:
         return render_template('maintenance.html'), 503
+    
     search_query = request.args.get('q', '').strip()
+    # Баг 5: Экранируем символы поиска
+    safe_query = search_query.replace('%', '').replace('_', '')
+    
     conn = sqlite3.connect('store.db')
     c = conn.cursor()
-    if search_query:
-        c.execute("SELECT * FROM products WHERE title LIKE ?", (f'%{search_query}%',))
+    if safe_query:
+        c.execute("SELECT * FROM products WHERE title LIKE ?", (f'%{safe_query}%',))
     else:
         c.execute("SELECT * FROM products")
     products = c.fetchall()
@@ -110,27 +120,69 @@ def register():
             flash('Вы должны согласиться на обработку данных!', 'error')
             return redirect(url_for('register'))
 
-        name = request.form['name']
-        email = request.form['email']
-        phone = request.form['phone']
+        name = request.form['name'].strip()
+        email = request.form['email'].strip()
+        phone = request.form['phone'].strip()
         
+        try:
+            validate_email(email, check_deliverability=False)
+        except EmailNotValidError:
+            flash('Введите корректный email адрес (например, name@mail.ru)', 'error')
+            return redirect(url_for('register'))
+
+        try:
+            parsed_phone = phonenumbers.parse(phone, "RU")
+            if not phonenumbers.is_valid_number(parsed_phone):
+                flash('Введите корректный номер телефона (например, +7 999 123-45-67)', 'error')
+                return redirect(url_for('register'))
+        except phonenumbers.NumberParseException:
+            flash('Неверный формат телефона!', 'error')
+            return redirect(url_for('register'))
+
+        # Баг 3: Быстрая проверка на дубликаты одним запросом
+        conn = sqlite3.connect('store.db')
+        c = conn.cursor()
+        c.execute("SELECT name, email, phone FROM users WHERE email = ? OR name = ? OR phone = ?", (email, name, phone))
+        duplicates = c.fetchall()
+        conn.close()
+
+        for d in duplicates:
+            if d[1].lower() == email.lower():
+                flash('Пользователь с такой почтой уже зарегистрирован!', 'error')
+                return redirect(url_for('register'))
+            if d[0].lower() == name.lower():
+                flash('Пользователь с таким ником уже зарегистрирован! Придумайте другой.', 'error')
+                return redirect(url_for('register'))
+            if d[2] == phone:
+                flash('Пользователь с таким номером телефона уже зарегистрирован!', 'error')
+                return redirect(url_for('register'))
+
         code = str(random.randint(1000, 9999))
         verification_codes[email] = code
         
-        # --- ОТПРАВКА ЧЕРЕЗ RESEND ---
         try:
-            params = {
-                "from": "NEXUS Market <onboarding@resend.dev>",
-                "to": [email],
-                "subject": "Код подтверждения NEXUS Market",
-                "html": f"<strong>Ваш код: {code}</strong>"
+            url = "https://api.brevo.com/v3/smtp/email"
+            headers = {
+                "accept": "application/json",
+                "api-key": BREVO_API_KEY,
+                "content-type": "application/json"
             }
-            resend.Emails.send(params)
-            flash('Код отправлен на почту!', 'success')
+            payload = {
+                "sender": {"name": "NEXUS Market", "email": SENDER_EMAIL},
+                "to": [{"email": email}],
+                "subject": "Код подтверждения NEXUS Market",
+                "htmlContent": f"<h2>Ваш код: {code}</h2>"
+            }
+            response = requests.post(url, json=payload, headers=headers)
+            
+            if response.status_code == 201:
+                flash('Код отправлен на почту!', 'success')
+            else:
+                print(f"❌ ОШИБКА BREVO: {response.text}")
+                flash(f'Ошибка отправки. ВАШ ТЕСТОВЫЙ КОД: {code}', 'error')
         except Exception as e:
-            print(f"❌ ОШИБКА RESEND: {e}")
+            print(f"❌ ОШИБКА СЕТИ: {e}")
             flash(f'Ошибка отправки. ВАШ ТЕСТОВЫЙ КОД: {code}', 'error')
-        # -----------------------------
         
         session['reg_name'] = name
         session['reg_email'] = email
@@ -152,7 +204,12 @@ def verify():
 def set_password():
     if 'verified_email' not in session: return redirect(url_for('register'))
     if request.method == 'POST':
-        hashed_pw = generate_password_hash(request.form['password'])
+        password = request.form['password']
+        if len(password) < 6:
+            flash('Пароль должен быть не короче 6 символов!', 'error')
+            return redirect(url_for('set_password'))
+
+        hashed_pw = generate_password_hash(password)
         try:
             conn = sqlite3.connect('store.db')
             c = conn.cursor()
@@ -170,37 +227,64 @@ def set_password():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    user_ip = request.remote_addr
+    # Баг 2: Правильное определение IP за прокси-сервером Layero
+    user_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    if user_ip:
+        user_ip = user_ip.split(',')[0].strip()
+
     current_time = time.time()
-    if user_ip in login_attempts and current_time < login_attempts[user_ip].get('lock_until', 0):
-        remaining = int(login_attempts[user_ip]['lock_until'] - current_time)
+    
+    conn = sqlite3.connect('store.db')
+    c = conn.cursor()
+    
+    # Баг 1: Проверка блокировки из базы данных
+    c.execute("SELECT count, lock_until FROM login_attempts WHERE ip = ?", (user_ip,))
+    attempt = c.fetchone()
+    
+    if attempt and current_time < attempt[1]:
+        remaining = int(attempt[1] - current_time)
+        conn.close()
         flash(f'Заблокировано. Ждите {remaining} сек.', 'error')
         return render_template('auth.html', mode='login', lockout_time=remaining)
+
     if request.method == 'POST':
-        email = request.form['email']
+        email = request.form['email'].strip()
         password = request.form['password']
-        conn = sqlite3.connect('store.db')
-        c = conn.cursor()
+        
         c.execute("SELECT name, password, role, is_banned FROM users WHERE email = ?", (email,))
         user = c.fetchone()
-        conn.close()
+        
         if user:
             if user[3] == 1:
                 flash('Ваш аккаунт заблокирован администрацией!', 'error')
+                conn.close()
                 return render_template('auth.html', mode='login')
+                
             if check_password_hash(user[1], password):
-                login_attempts[user_ip] = {'count': 0, 'lock_until': 0}
+                # Успешный вход: сбрасываем счетчик
+                c.execute("DELETE FROM login_attempts WHERE ip = ?", (user_ip,))
+                conn.commit()
                 session['user_name'] = user[0]
                 session['user_role'] = user[2]
                 session['user_email'] = email
+                conn.close()
                 return redirect(url_for('index'))
-        if user_ip not in login_attempts: login_attempts[user_ip] = {'count': 0, 'lock_until': 0}
-        login_attempts[user_ip]['count'] += 1
-        if login_attempts[user_ip]['count'] >= 10:
-            login_attempts[user_ip]['lock_until'] = current_time + 1800
+        
+        # Неудачная попытка
+        new_count = (attempt[0] if attempt else 0) + 1
+        
+        if new_count >= 10:
+            lock_time = current_time + 1800
+            c.execute("INSERT OR REPLACE INTO login_attempts (ip, count, lock_until) VALUES (?, ?, ?)", (user_ip, new_count, lock_time))
+            conn.commit()
+            conn.close()
             return render_template('auth.html', mode='login', lockout_time=1800)
         else:
-            flash(f'Неверные данные. Осталось попыток: {10 - login_attempts[user_ip]["count"]}', 'error')
+            c.execute("INSERT OR REPLACE INTO login_attempts (ip, count, lock_until) VALUES (?, ?, ?)", (user_ip, new_count, 0))
+            conn.commit()
+            flash(f'Неверные данные. Осталось попыток: {10 - new_count}', 'error')
+            
+    conn.close()
     return render_template('auth.html', mode='login')
 
 @app.route('/logout')
